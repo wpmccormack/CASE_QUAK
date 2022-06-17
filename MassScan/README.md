@@ -1,6 +1,6 @@
 # Bump Hunt Code
 
-For this code to work, you must set up and source Higgs Combine https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/.  I did the recommended 10_2_X version.  Setup instructions here: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version.  Make sure to setup cms environment and cmsenv in the release's src/ folder where you've pulled combine before running the bump hunt code
+For this code to work, you must set up and source Higgs Combine https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/.  I did the recommended 10_2_X version.  Setup instructions here: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version.  Use the version within a CMSSW environment.  Make sure to setup cms environment and cmsenv in the release's src/ folder where you've pulled combine before running the bump hunt code
 
 Important note: You need to copy the files in the scriptsForCombine/ directory here into the correct places in Combine.  Or rather, there are places in the files in scriptsForCombine/ that do gSystem->Load for a .so file.  This ia custom function.  You'll need to change the hard-coded locations of the .so files to the correct places in your environment and recompile the Combine code
 
