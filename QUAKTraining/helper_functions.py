@@ -2,7 +2,7 @@ from imports import *
 
 def smoothen_integers(input_dist):
     if (input_dist%1==0).all():
-        print("integer distribution detected...")
+        #print("integer distribution detected...")
         input_dist += np.random.normal(loc=0., scale=0.5, size=len(input_dist))
     return input_dist
 
@@ -274,15 +274,6 @@ def LAPS_test_CMS(sample_type='CMS', num_batches=1, Mjj_cut=1200, pt_cut=550, et
         else:
             norm_data = np.concatenate((norm_data, data[indices]), axis=0)
             masses = np.concatenate((masses, Mjj[indices]), axis=0)
-
-    #bad_jet1_btag_indices = np.where((data[:,5] < 0))[0]
-    #bad_jet2_btag_indices = np.where((data[:,12] < 0))[0]
-
-    #data[bad_jet1_btag_indices,5] = 0
-    #data[bad_jet2_btag_indices,12] = 0
-
-    #smooth_jet1_btagscore = smoothen_padding(data[:,5])
-    #smooth_jet2_btagscore = smoothen_padding(data[:,12])
 
     smooth_jet1_numpfconst = smoothen_integers(norm_data[:,6])
     smooth_jet2_numpfconst = smoothen_integers(norm_data[:,13])
@@ -773,6 +764,24 @@ def normalize_data(data,inp_mean=None,inp_std=None):
             data[:,index] = (data[:,index]-mean)/std
         return data
 
+def load_bkg_batch(sample,batch,Mjj_cut=1200,pt_cut=550,eta_cut=None):
+    train_batch = get_batch_file(sample, batch)
+    norm_data, masses = extract_trainVars(train_batch,Mjj_cut=Mjj_cut,pt_cut=pt_cut,eta_cut=eta_cut)
+
+    smooth_jet1_numpfconst = smoothen_integers(norm_data[:,6])
+    smooth_jet2_numpfconst = smoothen_integers(norm_data[:,13])
+
+    unnorm_data = np.copy(norm_data)
+    norm_data = normalize_data(norm_data)
+
+    return norm_data, unnorm_data, masses
+
+def load_full(sample,num_batches=1,bkg_mean=None,bkg_std=None):
+    data, unnorm_data, masses = LAPS_train(sample,num_batches=num_batches)
+    if bkg_mean is not None and bkg_std is not None:
+        data = normalize_data(data,inp_mean=bkg_mean,inp_std=bkg_std)
+    return data, unnorm_data, masses
+
 def load_and_split_bkg(sample,num_batches=1):
     # load data
     bkg_train, bkg_train_unnorm, bkg_train_masses = LAPS_train(sample_type=sample, num_batches=num_batches)
@@ -908,7 +917,7 @@ def train_pipeline_bkg(bkg_sample,params_dict):
                                                   save_model=save_model)
     # plot training curve
     plt.figure(figsize=(8,6))
-    plt.plot(sig_losses)
+    plt.plot(bkg_losses)
     plt.xlabel("Epoch")
     plt.ylabel("{0} training loss".format(bkg_sample))
     plt.savefig("plots/training_plots/"+flowName+"/training_curve.pdf")
@@ -994,13 +1003,13 @@ def train_pipeline_sig(sig_sample,bkg_sample,params_dict,train_frac=0.9,bkg_mode
 
     return [sig_flow, bkg_flow, sig_train_suite, sig_test_suite, bkg_test_suite]
 
-def load_model(sample,params={},name=None):
+def load_model(sample="",params={},name=None,device=torch.device("cuda:0")):
     if name is not None:
         if not os.path.exists("saved_flows/"+name):
             print("ERROR: no trained model exists!")
             return None
         else:
-            flow = torch.load("saved_flows/"+name)
+            flow = torch.load("saved_flows/"+name,map_location=device)
             return flow
     else:
         # parse model parameters
@@ -1015,65 +1024,83 @@ def load_model(sample,params={},name=None):
         bs = params_dict["bs"]
 
         # looking for pre-trained model
-        flowName = '{0}_clip{1}_{2}_k{3}_hf{4}_nbpl{5}_tb{6}.pt'.format(bkg_sample, clip, flow_type, num_layers, hidden_features, num_blocks_per_layer, tail_bound)
+        flowName = '{0}_clip{1}_{2}_k{3}_hf{4}_nbpl{5}_tb{6}.pt'.format(sample, clip, flow_type, num_layers, hidden_features, num_blocks_per_layer, tail_bound)
         if not os.path.exists("saved_flows/"+flowName):
             print("ERROR: no trained model exists!")
             return None
         else:
-            flow = torch.load("saved_flows/"+flowName)
+            flow = torch.load("saved_flows/"+flowName,map_location=device)
             return flow
 
 def eval_model(sig_samples,sig_model,sig_flow,bkg_model,bkg_flow,bkg_test,bkg_test_unnorm,bkg_test_masses,train_frac=0.9):
-    contaminations = {0.0001:"0p01pct",0.001:"0p1pct",0.01:"1pct"}
     bkg_mean_test = np.mean(bkg_test_unnorm,axis=0)
     bkg_std_test = np.std(bkg_test_unnorm,axis=0)
     for samp in sig_samples:
-        for sfrac in list(contaminations.keys()):
-            sig, sig_unnorm, sig_mass = load_test_sig(samp,train_frac,bkg_mean_test,bkg_std_test)
+        sig, sig_unnorm, sig_mass = load_test_sig(samp,train_frac,bkg_mean_test,bkg_std_test)
+        sig_vals = (sig,sig_unnorm,sig_mass)
+        bkg_vals = (bkg,bkg_unnorm,bkg_mass)
+        test_masses, sigtr_test_losses, bkgtr_test_losses, test_labels = prepare_stats_data(sig_flow,bkg_flow,sig_vals,bkg_vals)
+        output = np.array([test_masses,sigtr_test_losses,bkgtr_test_losses,test_labels])
 
-            nsig = sig.shape[0]
-            ntot = int(nsig/sfrac)
-            nbkg = ntot - nsig
-            nbkg_max = bkg_test.shape[0]
+        if not os.path.isdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_model,bkg_model)):
+            os.mkdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_model,bkg_model))
+        outFile = "sigTrain{0}_bkgTrain{1}/test_{2}.npy".format(sig_model,bkg_model,samp)
+        np.save("test_data_forStats/"+outFile,output)
 
-            if nbkg > nbkg_max:
-                nsig = int(sfrac*nbkg_max/(1-sfrac))
-                nbkg = nbkg_max
+        plt.figure(figsize = (10,10))
+        sig_bkgtr_test_losses = bkgtr_test_losses[test_labels==1]
+        sig_sigtr_test_losses = sigtr_test_losses[test_labels==1]
+        bkg_bkgtr_test_losses = bkgtr_test_losses[test_labels==0]
+        bkg_sigtr_test_losses = sigtr_test_losses[test_labels==0]
+        plt.scatter(bkg_bkgtr_test_losses,bkg_sigtr_test_losses,s=2,label="{0} Test Data".format(bkg_model))
+        plt.scatter(sig_bkgtr_test_losses,sig_sigtr_test_losses,s=2,label="{0} Test Data".format(samp))
+        plt.legend(loc='upper right',fontsize=14)
+        plt.xlim([0,50])
+        plt.ylim([0,50])
+        plt.xticks(np.arange(0,55,step=5))
+        plt.yticks(np.arange(0,55,step=5))
+        plt.title("Signal Trained on {0}".format(sig_model))
+        saveLoc = "plots/QUAK_spaces/sigTrain{0}_bkgTrain{1}/".format(sig_model,bkg_model)
+        if not os.path.isdir(saveLoc):
+            os.mkdir(saveLoc)
+        saveFile = saveLoc+"eval_{0}.png".format(samp)
+        plt.savefig(saveFile)
+        plt.close()
 
-            sig = sig[:nsig]
-            sig_unnorm = sig_unnorm[:nsig]
-            sig_mass = sig_mass[:nsig]
-            bkg = bkg_test[:nbkg]
-            bkg_unnorm = bkg_test_unnorm[:nbkg]
-            bkg_mass = bkg_test_masses[:nbkg]
+        del test_masses, sigtr_test_losses, bkgtr_test_losses, test_labels
+        del output
 
-            sig_vals = (sig,sig_unnorm,sig_mass)
-            bkg_vals = (bkg,bkg_unnorm,bkg_mass)
-            test_masses, sigtr_test_losses, bkgtr_test_losses, test_labels = prepare_stats_data(sig_flow,bkg_flow,sig_vals,bkg_vals)
-            output = np.array([test_masses,sigtr_test_losses,bkgtr_test_losses,test_labels])
+def evalAndSave(sig_flow,sig_flow_name,bkg_flow,bkg_flow_name,test_data,test_masses,test_name,label):
+    nev = test_data.shape[0]
+    labels = label*np.ones(nev,dtype='float32')
+    bkgtr_test_losses = -bkg_flow.log_prob(test_data)[0].detach().cpu().numpy()
+    sigtr_test_losses = -sig_flow.log_prob(test_data)[0].detach().cpu().numpy()
+    output = np.array([test_masses,sigtr_test_losses,bkgtr_test_losses,labels])
 
-            if not os.path.isdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_model,bkg_model)):
-                os.mkdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_model,bkg_model))
-            outFile = "sigTrain{0}_bkgTrain{1}/test_{2}_contam{3}.npy".format(sig_model,bkg_model,samp,contaminations[sfrac])
-            np.save("test_data_forStats/"+outFile,output)
+    if not os.path.isdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_flow_name,bkg_flow_name)):
+        os.mkdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_flow_name,bkg_flow_name))
+    outFile = "sigTrain{0}_bkgTrain{1}/eval_{2}.npy".format(sig_flow_name,bkg_flow_name,test_name)
+    np.save("test_data_forStats/"+outFile,output)
 
-            if sfrac == max(list(contaminations.keys())):
-                plt.figure(figsize = (10,10))
-                sig_bkgtr_test_losses = bkgtr_test_losses[test_labels==1]
-                sig_sigtr_test_losses = sigtr_test_losses[test_labels==1]
-                bkg_bkgtr_test_losses = bkgtr_test_losses[test_labels==0]
-                bkg_sigtr_test_losses = sigtr_test_losses[test_labels==0]
-                plt.scatter(bkg_bkgtr_test_losses,bkg_sigtr_test_losses,s=2,label="{0} Test Data".format(bkg_model))
-                plt.scatter(sig_bkgtr_test_losses,sig_sigtr_test_losses,s=2,label="{0} Test Data".format(samp))
-                plt.legend(loc='upper right',fontsize=14)
-                plt.xlim([0,50])
-                plt.ylim([0,50])
-                plt.xticks(np.arange(0,55,step=5))
-                plt.yticks(np.arange(0,55,step=5))
-                plt.title("Signal Trained on {0}".format(sig_model))
-                saveLoc = "plots/QUAK_spaces/sigTrain{0}_bkgTrain{1}/".format(sig_model,bkg_model)
-                if not os.path.isdir(saveLoc):
-                    os.mkdir(saveLoc)
-                saveFile = saveLoc+"eval_{0}.png".format(samp)
-                plt.savefig(saveFile)
-                plt.close()
+    del bkgtr_test_losses, sigtr_test_losses
+    del output
+    torch.cuda.empty_cache()
+
+def sig_vs_bkg_2DQuakSpace(sig_train_name,bkg_train_name,sig_bkgtr_test_losses,sig_sigtr_test_losses,bkg_bkgtr_test_losses,bkg_sigtr_test_losses,sig_name):
+    plt.figure(figsize = (10,10))
+    plt.scatter(bkg_bkgtr_test_losses,bkg_sigtr_test_losses,s=2,label="{0}".format(bkg_train_name))
+    plt.scatter(sig_bkgtr_test_losses,sig_sigtr_test_losses,s=2,label="{0}".format(sig_name))
+    plt.legend(loc='upper right',fontsize=14)
+    plt.xlim([0,50])
+    plt.ylim([0,50])
+    plt.xticks(np.arange(0,55,step=5))
+    plt.yticks(np.arange(0,55,step=5))
+    plt.title("Signal Trained on {0}".format(sig_train_name))
+    saveLoc = "plots/QUAK_spaces/sigTrain{0}_bkgTrain{1}/".format(sig_train_name,bkg_train_name)
+    if not os.path.isdir(saveLoc):
+        os.mkdir(saveLoc)
+    saveFile = saveLoc+"eval_{0}.png".format(sig_name)
+    plt.savefig(saveFile)
+    plt.close()
+
+    del sig_bkgtr_test_losses, sig_sigtr_test_losses, bkg_bkgtr_test_losses, bkg_sigtr_test_losses

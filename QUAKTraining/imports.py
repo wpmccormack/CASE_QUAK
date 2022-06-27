@@ -27,9 +27,9 @@ import re
 import os
 import json
 
-sys.path.append("../new_flows")
-from flows import RealNVP, Planar, MAF
-from models import NormalizingFlowModel
+#sys.path.append("../new_flows")
+#from flows import RealNVP, Planar, MAF
+#from models import NormalizingFlowModel
 from nflows.flows.base import Flow
 from nflows.flows.autoregressive import MaskedAutoregressiveFlow
 from nflows.distributions.normal import StandardNormal
