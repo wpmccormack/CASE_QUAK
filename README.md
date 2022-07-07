@@ -53,8 +53,11 @@ Of course, you can see what the various arguments are by looking in combineScan.
 Another very important thing to note is that the main fitting code relies on *signal templates*.  To derive the signal templates, you need to follow the instrucitons like: https://github.com/case-team/CASEUtils/blob/master/fitting/fit_signalshape_template.sh.  I have templates which you can use at
 
 /uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation (this is graviton signal)
+
 /uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation_QstarToQW_mW_400
+
 /uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation_WpToBpT_Bp400_Top170
+
 /uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation_XToYYprimeTo4Q_MY80_MYprime170
 
 You can just copy those directories to whereever you want to use them.  Right now, it is hard-coded that these directories will be within your "fitting" directory.
