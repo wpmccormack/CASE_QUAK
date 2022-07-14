@@ -38,7 +38,7 @@ class Flow(Distribution):
         embedded_context = self._embedding_net(context)
         noise, logabsdet = self._transform(inputs, context=embedded_context)
         log_prob = self._distribution.log_prob(noise, context=embedded_context)
-        return log_prob + logabsdet, log_prob            
+        return log_prob + logabsdet, log_prob
 
     def _sample(self, num_samples, context):
         embedded_context = self._embedding_net(context)

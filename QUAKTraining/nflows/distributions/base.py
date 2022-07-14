@@ -39,6 +39,29 @@ class Distribution(nn.Module):
                 )
         return self._log_prob(inputs, context)
 
+    def eval_log_prob(self,inputs,context=None):
+        """
+        Memory-safe log-prob calculation so we don't fill up the GPU when we're evaluating the model!
+        """
+        inputs = torch.as_tensor(inputs)
+        if context is not None:
+            context = torch.as_tensor(context)
+            if inputs.shape[0] != context.shape[0]:
+                raise ValueError(
+                    "Number of input items must be equal to number of context items."
+                )
+        embedded_context = self._embedding_net(context)
+        noise, logabsdet = self._transform(inputs, context=embedded_context)
+        log_prob = self._distribution.log_prob(noise, context=embedded_context)
+
+        log_prob_out = log_prob.detach().cpu().numpy()
+        logabsdet_out = logabsdet.detach().cpu().numpy()
+
+        del inputs, noise, log_prob, logabsdet
+        torch.cuda.empty_cache()
+
+        return log_prob_out + logabsdet_out, log_prob_out
+
     def _log_prob(self, inputs, context):
         raise NotImplementedError()
 

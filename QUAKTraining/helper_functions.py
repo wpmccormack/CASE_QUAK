@@ -78,7 +78,7 @@ def get_batch_file(inp_sample_type, inp_batch_number,invert=False):
             batch = samp_lib[inp_sample_type]
     return batch
 
-def extract_trainVars(sample,Mjj_cut=1200,pt_cut=550,eta_cut=None):
+def extract_trainVars(sample,Mjj_cut=1200,pt_cut=550,eta_cut=None,add_mjj=False,add_lsf3=False):
     f = h5py.File(sample, "r")
 
     jet_kinematics = f['jet_kinematics']
@@ -101,6 +101,7 @@ def extract_trainVars(sample,Mjj_cut=1200,pt_cut=550,eta_cut=None):
     jet1_tau2 = np.reshape(jet1_extraInfo[:,1], (-1,1))
     jet1_tau3 = np.reshape(jet1_extraInfo[:,2], (-1,1))
     jet1_tau4 = np.reshape(jet1_extraInfo[:,3], (-1,1))
+    jet1_lsf3 = np.reshape(jet1_extraInfo[:,4], (-1,1))
     jet1_btagscore = np.reshape(jet1_extraInfo[:,5],(-1,1))
     jet1_numpfconst = np.reshape(jet1_extraInfo[:,6],(-1,1))
 
@@ -113,6 +114,7 @@ def extract_trainVars(sample,Mjj_cut=1200,pt_cut=550,eta_cut=None):
     jet2_tau2 = np.reshape(jet2_extraInfo[:,1], (-1,1))
     jet2_tau3 = np.reshape(jet2_extraInfo[:,2], (-1,1))
     jet2_tau4 = np.reshape(jet2_extraInfo[:,3], (-1,1))
+    jet2_lsf3 = np.reshape(jet2_extraInfo[:,4], (-1,1))
     jet2_btagscore = np.reshape(jet2_extraInfo[:,5],(-1,1))
     jet2_numpfconst = np.reshape(jet2_extraInfo[:,6],(-1,1))
 
@@ -121,8 +123,20 @@ def extract_trainVars(sample,Mjj_cut=1200,pt_cut=550,eta_cut=None):
     jet2_tau43 = jet2_tau4 / jet2_tau3
     jet2_sqrt_tau21 = np.sqrt(jet2_tau21) / jet2_tau1
 
-    data = np.concatenate((Mj1, jet1_tau21, jet1_tau32, jet1_tau43, jet1_sqrt_tau21, jet1_btagscore, jet1_numpfconst,
-                           Mj2, jet2_tau21, jet2_tau32, jet2_tau43, jet2_sqrt_tau21, jet2_btagscore, jet2_numpfconst), axis=1)
+    all_vars = [Mj1, jet1_tau21, jet1_tau32, jet1_tau43, jet1_sqrt_tau21, jet1_btagscore, jet1_numpfconst,
+                Mj2, jet2_tau21, jet2_tau32, jet2_tau43, jet2_sqrt_tau21, jet2_btagscore, jet2_numpfconst]
+    varNames = [r'$M_{j1}$', r'Jet 1 $\tau_{21}$', r'Jet 1 $\tau_{32}$', r'Jet 1 $\tau_{43}$', r'Jet 1 $\tau_s$', r'Jet 1 $P_b$', r'Jet 1 $n_{pf}$',
+                r'$M_{j2}$', r'Jet 2 $\tau_{21}$', r'Jet 2 $\tau_{32}$', r'Jet 2 $\tau_{43}$', r'Jet 2 $\tau_s$', r'Jet 2 $P_b$', r'Jet 2 $n_{pf}$']
+    if add_mjj:
+        all_vars.append(Mjj)
+        varNames.append(r'$M_{jj}$')
+    if add_lsf3:
+        all_vars.append(jet1_lsf3)
+        all_vars.append(jet2_lsf3)
+        varNames.append(r'Jet 1 LSF$_3$')
+        varNames.append(r'Jet 2 LSF$_3$')
+
+    data = np.concatenate(all_vars, axis=1)
 
     indices = np.where((Mjj > Mjj_cut)
                               & (jet1_pt > pt_cut)
@@ -143,13 +157,14 @@ def extract_trainVars(sample,Mjj_cut=1200,pt_cut=550,eta_cut=None):
     norm_data = data[indices]
     masses = Mjj[indices]
 
-    return norm_data, masses
+    return norm_data, masses, varNames
 
-def LAPS_train(sample_type, num_batches=1, Mjj_cut=1200, pt_cut=550, eta_cut=None, inp_meanstd=None, invert=False):    #LAPS stands for Load And Process Samples
+def LAPS_train(sample_type, num_batches=1, Mjj_cut=1200, pt_cut=550, eta_cut=None, inp_meanstd=None, invert=False, add_mjj=False, add_lsf3=False):
+    #LAPS stands for Load And Process Samples
     norm_data = []
     for batch_number in range(num_batches):
         train_batch = get_batch_file(sample_type, batch_number, invert=invert)
-        norm_data0, masses0 = extract_trainVars(train_batch,Mjj_cut=Mjj_cut,pt_cut=pt_cut,eta_cut=eta_cut)
+        norm_data0, masses0, varNames = extract_trainVars(train_batch,Mjj_cut=Mjj_cut,pt_cut=pt_cut,eta_cut=eta_cut,add_mjj=add_mjj,add_lsf3=add_lsf3)
         if batch_number == 0:
             norm_data, masses = norm_data0, masses0
         else:
@@ -161,254 +176,7 @@ def LAPS_train(sample_type, num_batches=1, Mjj_cut=1200, pt_cut=550, eta_cut=Non
 
     unnorm_data = np.copy(norm_data)
 
-    return norm_data, unnorm_data, masses
-
-def LAPS_test(sample_type, num_batches=1, Mjj_cut=1200, pt_cut=550, eta_cut=None, inp_meanstd=None):    #LAPS stands for Load And Process Samples
-    norm_data = []
-    for batch_number in range(num_batches):
-        train_batch = get_batch_file(sample_type, batch_number,invert=True)
-        norm_data0, masses0 = extract_trainVars(train_batch,Mjj_cut=Mjj_cut,pt_cut=pt_cut,eta_cut=eta_cut)
-        if batch_number == 0:
-            norm_data, masses = norm_data0, masses0
-        else:
-            norm_data = np.concatenate((norm_data,norm_data0),axis=0)
-            masses = np.concatenate((masses,masses0),axis=0)
-
-    smooth_jet1_numpfconst = smoothen_integers(norm_data[:,6])
-    smooth_jet2_numpfconst = smoothen_integers(norm_data[:,13])
-
-    unnorm_data = np.copy(norm_data)
-
-    return norm_data, unnorm_data, masses
-
-def LAPS_test_CMS(sample_type='CMS', num_batches=1, Mjj_cut=1200, pt_cut=550, eta_cut=None, inp_meanstd=None):    #LAPS stands for Load And Process Samples
-
-    new_samples = True
-
-    data = np.array([])
-
-    for batch_number in range(num_batches):
-
-        test_batch = get_batch_file(sample_type, new_samples, batch_number)
-        f = h5py.File(test_batch, "r")
-
-        jet_kinematics = f['jet_kinematics']
-        jet1_extraInfo = f['jet1_extraInfo']
-        jet2_extraInfo = f['jet2_extraInfo']
-        truth_label = f['truth_label']
-
-        np.seterr(invalid = 'ignore')
-
-        delta_eta = jet_kinematics[:,1]
-
-        Mjj = np.reshape(jet_kinematics[:,0], (-1,1))
-        Mj1 = np.reshape(jet_kinematics[:,5], (-1,1))
-        Mj2 = np.reshape(jet_kinematics[:,9], (-1,1))
-
-        jet1_pt = np.reshape(jet_kinematics[:,2], (-1,1))
-        jet2_pt = np.reshape(jet_kinematics[:,6], (-1,1))
-
-        jet1_tau1 = np.reshape(jet1_extraInfo[:,0], (-1,1))
-        jet1_tau2 = np.reshape(jet1_extraInfo[:,1], (-1,1))
-        jet1_tau3 = np.reshape(jet1_extraInfo[:,2], (-1,1))
-        jet1_tau4 = np.reshape(jet1_extraInfo[:,3], (-1,1))
-        jet1_btagscore = np.reshape(jet1_extraInfo[:,5],(-1,1))
-        jet1_numpfconst = np.reshape(jet1_extraInfo[:,6],(-1,1))
-
-        jet1_tau21 = jet1_tau2 / jet1_tau1
-        jet1_tau32 = jet1_tau3 / jet1_tau2
-        jet1_tau43 = jet1_tau4 / jet1_tau3
-        jet1_sqrt_tau21 = np.sqrt(jet1_tau21) / jet1_tau1
-
-        jet2_tau1 = np.reshape(jet2_extraInfo[:,0], (-1,1))
-        jet2_tau2 = np.reshape(jet2_extraInfo[:,1], (-1,1))
-        jet2_tau3 = np.reshape(jet2_extraInfo[:,2], (-1,1))
-        jet2_tau4 = np.reshape(jet2_extraInfo[:,3], (-1,1))
-        jet2_btagscore = np.reshape(jet2_extraInfo[:,5],(-1,1))
-        jet2_numpfconst = np.reshape(jet2_extraInfo[:,6],(-1,1))
-
-        jet2_tau21 = jet2_tau2 / jet2_tau1
-        jet2_tau32 = jet2_tau3 / jet2_tau2
-        jet2_tau43 = jet2_tau4 / jet2_tau3
-        jet2_sqrt_tau21 = np.sqrt(jet2_tau21) / jet2_tau1
-
-        if not new_samples:
-            truth_label = truth_label[:]
-
-        data = np.concatenate((Mj1, jet1_tau21, jet1_tau32, jet1_tau43, jet1_sqrt_tau21, jet1_btagscore, jet1_numpfconst,
-                               Mj2, jet2_tau21, jet2_tau32, jet2_tau43, jet2_sqrt_tau21, jet2_btagscore, jet2_numpfconst), axis=1)
-
-        if not new_samples:
-            indices = np.where((truth_label == inp_truth_label)
-                                      & (Mjj > Mjj_cut)
-                                      & (jet1_pt > pt_cut)
-                                      & (jet2_pt > pt_cut)
-                                      & (np.isfinite(jet1_tau21))
-                                      & (np.isfinite(jet1_tau32))
-                                      & (np.isfinite(jet1_tau43))
-                                      & (np.isfinite(jet1_sqrt_tau21))
-                                      & (np.isfinite(jet2_tau21))
-                                      & (np.isfinite(jet2_tau32))
-                                      & (np.isfinite(jet2_tau43))
-                                      & (np.isfinite(jet2_sqrt_tau21)))[0]
-        else:
-            indices = np.where((Mjj > Mjj_cut)
-                                      & (jet1_pt > pt_cut)
-                                      & (jet2_pt > pt_cut)
-                                      & (np.isfinite(jet1_tau21))
-                                      & (np.isfinite(jet1_tau32))
-                                      & (np.isfinite(jet1_tau43))
-                                      & (np.isfinite(jet1_sqrt_tau21))
-                                      & (np.isfinite(jet2_tau21))
-                                      & (np.isfinite(jet2_tau32))
-                                      & (np.isfinite(jet2_tau43))
-                                      & (np.isfinite(jet2_sqrt_tau21)))[0]
-
-        if eta_cut is not None:
-            eta_indices = np.where((np.abs(delta_eta) < eta_cut))[0]
-            indices = np.intersect1d(indices, eta_indices)
-
-        if batch_number == 0:
-            norm_data = data[indices]
-            masses = Mjj[indices]
-        else:
-            norm_data = np.concatenate((norm_data, data[indices]), axis=0)
-            masses = np.concatenate((masses, Mjj[indices]), axis=0)
-
-    smooth_jet1_numpfconst = smoothen_integers(norm_data[:,6])
-    smooth_jet2_numpfconst = smoothen_integers(norm_data[:,13])
-
-    unnorm_data = np.copy(norm_data)
-
-    if inp_meanstd is None:
-        for index in range(norm_data.shape[1]):
-            mean = np.mean(norm_data[:,index])
-            std = np.std(norm_data[:,index])
-            norm_data[:,index] = (norm_data[:,index]-mean)/std
-    else:
-        mean_vec = inp_meanstd[0]
-        std_vec = inp_meanstd[1]
-        for index in range(norm_data.shape[1]):
-            mean = mean_vec[index]
-            std = std_vec[index]
-            norm_data[:,index] = (norm_data[:,index]-mean)/std
-
-    return norm_data, unnorm_data, masses
-
-def load_sample(sample_type,pt_cut=550,eta_cut=None,inp_meanstd=None):
-    new_samples = True
-    if sample_type != 'QCDBKG':
-        num_batches = 1
-
-    data = np.array([])
-
-    for batch_number in range(num_batches):
-
-        train_batch = get_batch_file(sample_type, new_samples, batch_number)
-        f = h5py.File(train_batch, "r")
-
-        jet_kinematics = f['jet_kinematics']
-        jet1_extraInfo = f['jet1_extraInfo']
-        jet2_extraInfo = f['jet2_extraInfo']
-        truth_label = f['truth_label']
-
-        np.seterr(invalid = 'ignore')
-
-        delta_eta = jet_kinematics[:,1]
-
-        Mjj = np.reshape(jet_kinematics[:,0], (-1,1))
-        Mj1 = np.reshape(jet_kinematics[:,5], (-1,1))
-        Mj2 = np.reshape(jet_kinematics[:,9], (-1,1))
-
-        jet1_pt = np.reshape(jet_kinematics[:,2], (-1,1))
-        jet2_pt = np.reshape(jet_kinematics[:,6], (-1,1))
-
-        jet1_tau1 = np.reshape(jet1_extraInfo[:,0], (-1,1))
-        jet1_tau2 = np.reshape(jet1_extraInfo[:,1], (-1,1))
-        jet1_tau3 = np.reshape(jet1_extraInfo[:,2], (-1,1))
-        jet1_tau4 = np.reshape(jet1_extraInfo[:,3], (-1,1))
-        jet1_btagscore = np.reshape(jet1_extraInfo[:,5],(-1,1))
-        jet1_numpfconst = np.reshape(jet1_extraInfo[:,6],(-1,1))
-
-        jet1_tau21 = jet1_tau2 / jet1_tau1
-        jet1_tau32 = jet1_tau3 / jet1_tau2
-        jet1_tau43 = jet1_tau4 / jet1_tau3
-        jet1_sqrt_tau21 = np.sqrt(jet1_tau21) / jet1_tau1
-
-        jet2_tau1 = np.reshape(jet2_extraInfo[:,0], (-1,1))
-        jet2_tau2 = np.reshape(jet2_extraInfo[:,1], (-1,1))
-        jet2_tau3 = np.reshape(jet2_extraInfo[:,2], (-1,1))
-        jet2_tau4 = np.reshape(jet2_extraInfo[:,3], (-1,1))
-        jet2_btagscore = np.reshape(jet2_extraInfo[:,5],(-1,1))
-        jet2_numpfconst = np.reshape(jet2_extraInfo[:,6],(-1,1))
-
-        jet2_tau21 = jet2_tau2 / jet2_tau1
-        jet2_tau32 = jet2_tau3 / jet2_tau2
-        jet2_tau43 = jet2_tau4 / jet2_tau3
-        jet2_sqrt_tau21 = np.sqrt(jet2_tau21) / jet2_tau1
-
-        if not new_samples:
-            truth_label = truth_label[:]
-
-        data = np.concatenate((Mj1, jet1_tau21, jet1_tau32, jet1_tau43, jet1_sqrt_tau21, jet1_btagscore, jet1_numpfconst,
-                               Mj2, jet2_tau21, jet2_tau32, jet2_tau43, jet2_sqrt_tau21, jet2_btagscore, jet2_numpfconst), axis=1)
-
-        if not new_samples:
-            indices = np.where((truth_label == inp_truth_label)
-                                      & (Mjj > Mjj_cut)
-                                      & (jet1_pt > pt_cut)
-                                      & (jet2_pt > pt_cut)
-                                      & (np.isfinite(jet1_tau21))
-                                      & (np.isfinite(jet1_tau32))
-                                      & (np.isfinite(jet1_tau43))
-                                      & (np.isfinite(jet1_sqrt_tau21))
-                                      & (np.isfinite(jet2_tau21))
-                                      & (np.isfinite(jet2_tau32))
-                                      & (np.isfinite(jet2_tau43))
-                                      & (np.isfinite(jet2_sqrt_tau21)))[0]
-        else:
-            indices = np.where((Mjj > Mjj_cut)
-                                      & (jet1_pt > pt_cut)
-                                      & (jet2_pt > pt_cut)
-                                      & (np.isfinite(jet1_tau21))
-                                      & (np.isfinite(jet1_tau32))
-                                      & (np.isfinite(jet1_tau43))
-                                      & (np.isfinite(jet1_sqrt_tau21))
-                                      & (np.isfinite(jet2_tau21))
-                                      & (np.isfinite(jet2_tau32))
-                                      & (np.isfinite(jet2_tau43))
-                                      & (np.isfinite(jet2_sqrt_tau21)))[0]
-
-        if eta_cut is not None:
-            eta_indices = np.where((np.abs(delta_eta) < eta_cut))[0]
-            indices = np.intersect1d(indices, eta_indices)
-
-        if batch_number == 0:
-            norm_data = data[indices]
-            masses = Mjj[indices]
-        else:
-            norm_data = np.concatenate((norm_data, data[indices]), axis=0)
-            masses = np.concatenate((masses, Mjj[indices]), axis=0)
-
-    smooth_jet1_numpfconst = smoothen_integers(norm_data[:,6])
-    smooth_jet2_numpfconst = smoothen_integers(norm_data[:,13])
-
-    unnorm_data = np.copy(norm_data)
-
-    if inp_meanstd is None:
-        for index in range(norm_data.shape[1]):
-            mean = np.mean(norm_data[:,index])
-            std = np.std(norm_data[:,index])
-            norm_data[:,index] = (norm_data[:,index]-mean)/std
-    else:
-        mean_vec = inp_meanstd[0]
-        std_vec = inp_meanstd[1]
-        for index in range(norm_data.shape[1]):
-            mean = mean_vec[index]
-            std = std_vec[index]
-            norm_data[:,index] = (norm_data[:,index]-mean)/std
-
-    return norm_data, unnorm_data, masses
+    return norm_data, unnorm_data, masses, varNames
 
 def train_NF(input_iterator,flowName,flow_type="NSQUAD",
              num_features=14,hidden_features=56,num_layers=4,num_blocks_per_layer=4,tail_bound=5.0,
@@ -502,10 +270,8 @@ def train_NF(input_iterator,flowName,flow_type="NSQUAD",
 
     return best_flow, min_loss, cur_losses
 
-def plot_input_variables(data,sample):
+def plot_input_variables(data,sample,varNames):
     num_features = int(data.shape[1])
-    plot_titles = [r'$M_{j1}$', r'Jet 1 $\tau_{21}$', r'Jet 1 $\tau_{32}$', r'Jet 1 $\tau_{43}$', r'Jet 1 $\tau_s$', r'Jet 1 $P_b$', r'Jet 1 $n_{pf}$',
-              r'$M_{j2}$', r'Jet 2 $\tau_{21}$', r'Jet 2 $\tau_{32}$', r'Jet 2 $\tau_{43}$', r'Jet 2 $\tau_s$', r'Jet 2 $P_b$', r'Jet 2 $n_{pf}$']
     plt.figure(figsize=(18,18))
     plt.rcParams['font.size'] = 10
     plt.rcParams['legend.fontsize'] = 8
@@ -516,19 +282,17 @@ def plot_input_variables(data,sample):
         n, bins, patches = plt.hist(data[:, index], bins=50, histtype='step', label='Truth')
         if index % 16 == 0:
             plt.legend(loc='best')
-        plt.title(plot_titles[index])
+        plt.title(varNames[index])
     if not os.path.isdir("plots/training_plots/"+sample):
         os.mkdir("plots/training_plots/"+sample)
     plt.savefig("plots/training_plots/"+sample+"/train_input.pdf")
     plt.close()
 
-def plot_density_estimation(flow,data,pdfpage=None):
+def plot_density_estimation(flow,data,varNames,pdfpage=None):
     n_samples = int(data.shape[0])
     num_features = int(data.shape[1])
     with torch.no_grad():
         samples = flow.sample(n_samples).detach().cpu().numpy()
-    plot_titles = [r'$M_{j1}$', r'Jet 1 $\tau_{21}$', r'Jet 1 $\tau_{32}$', r'Jet 1 $\tau_{43}$', r'Jet 1 $\tau_s$', r'Jet 1 $P_b$', r'Jet 1 $n_{pf}$',
-              r'$M_{j2}$', r'Jet 2 $\tau_{21}$', r'Jet 2 $\tau_{32}$', r'Jet 2 $\tau_{43}$', r'Jet 2 $\tau_s$', r'Jet 2 $P_b$', r'Jet 2 $n_{pf}$']
 
     plt.figure(figsize=(18,18))
     plt.rcParams['font.size'] = 10
@@ -541,7 +305,7 @@ def plot_density_estimation(flow,data,pdfpage=None):
         plt.hist(samples[:, index], bins=bins, histtype='step', label='NF Density')
         if index % 16 == 0:
             plt.legend(loc='best')
-        plt.title(plot_titles[index])
+        plt.title(varNames[index])
     #plt.savefig(plot_dir+"bkg_train_sample_densities.pdf")
     #plt.show()
     if pdfpage is not None:
@@ -549,8 +313,8 @@ def plot_density_estimation(flow,data,pdfpage=None):
         plt.close()
 
 def make_aucs_bkgtr(bkg_flow,sig_data,bkg_data,save=False,pdfpage=None):
-    bkgtr_bkgloss = -bkg_flow.log_prob(bkg_data)[0].detach().cpu().numpy()
-    bkgtr_sigloss = -bkg_flow.log_prob(sig_data)[0].detach().cpu().numpy()
+    bkgtr_bkgloss = -bkg_flow.eval_log_prob(bkg_data)[0]
+    bkgtr_sigloss = -bkg_flow.eval_log_prob(sig_data)[0]
     bins = np.linspace(0,100,10001)
     tpr = []
     fpr = []
@@ -587,8 +351,8 @@ def make_aucs_bkgtr(bkg_flow,sig_data,bkg_data,save=False,pdfpage=None):
     return
 
 def make_aucs_sigtr(sig_flow,sig_data,bkg_data,save=False,pdfpage=None):
-    sigtr_bkgloss = -sig_flow.log_prob(bkg_data)[0].detach().cpu().numpy()
-    sigtr_sigloss = -sig_flow.log_prob(sig_data)[0].detach().cpu().numpy()
+    sigtr_bkgloss = -sig_flow.eval_log_prob(bkg_data)[0]
+    sigtr_sigloss = -sig_flow.eval_log_prob(sig_data)[0]
     bins = np.linspace(0,100,10001)
     tpr = []
     fpr = []
@@ -625,8 +389,8 @@ def make_aucs_sigtr(sig_flow,sig_data,bkg_data,save=False,pdfpage=None):
     return
 
 def draw_2d_quak_space(sig_flow,bkg_flow,data,title,pdfpage=None):
-    bkg_loss = -bkg_flow.log_prob(data)[0].detach().cpu().numpy()
-    sig_loss = -sig_flow.log_prob(data)[0].detach().cpu().numpy()
+    bkg_loss = -bkg_flow.eval_log_prob(data)[0]
+    sig_loss = -sig_flow.eval_log_prob(data)[0]
 
     plt.figure(figsize=(10,10))
     bins = np.linspace(0,50,51)
@@ -643,11 +407,11 @@ def draw_2d_quak_space(sig_flow,bkg_flow,data,title,pdfpage=None):
     return
 
 def draw_2d_quak_SigVsBkg(sig_flow,bkg_flow,sig_data,bkg_data,xlim=50,ylim=50,pdfpage=None):
-    sigtr_sigloss = -sig_flow.log_prob(sig_data)[0].detach().cpu().numpy()
-    sigtr_bkgloss = -sig_flow.log_prob(bkg_data)[0].detach().cpu().numpy()
+    sigtr_sigloss = -sig_flow.eval_log_prob(sig_data)[0]
+    sigtr_bkgloss = -sig_flow.eval_log_prob(bkg_data)[0]
 
-    bkgtr_sigloss = -bkg_flow.log_prob(sig_data)[0].detach().cpu().numpy()
-    bkgtr_bkgloss = -bkg_flow.log_prob(bkg_data)[0].detach().cpu().numpy()
+    bkgtr_sigloss = -bkg_flow.eval_log_prob(sig_data)[0]
+    bkgtr_bkgloss = -bkg_flow.eval_log_prob(bkg_data)[0]
 
     plt.figure(figsize=(10,10))
     plt.scatter(bkgtr_bkgloss,sigtr_bkgloss,s=2,label = "Bkg Test Data")
@@ -664,14 +428,14 @@ def draw_2d_quak_SigVsBkg(sig_flow,bkg_flow,sig_data,bkg_data,xlim=50,ylim=50,pd
     return
 
 def draw_2d_quak_MultiSigVsBkg(sig_flow,bkg_flow,sig_data,sig_labels,bkg_data,xlim=50,ylim=50,pdfpage=None):
-    bkgtr_bkgloss = -bkg_flow.log_prob(bkg_data)[0].detach().cpu().numpy()
-    sigtr_bkgloss = -sig_flow.log_prob(bkg_data)[0].detach().cpu().numpy()
+    bkgtr_bkgloss = -bkg_flow.eval_log_prob(bkg_data)[0]
+    sigtr_bkgloss = -sig_flow.eval_log_prob(bkg_data)[0]
 
     plt.figure(figsize=(10,10))
     plt.scatter(bkgtr_bkgloss,sigtr_bkgloss,s=2,label = "Bkg Test Data")
     for i,dataset in enumerate(sig_data):
-        sigtr_sigloss = -sig_flow.log_prob(dataset)[0].detach().cpu().numpy()
-        bkgtr_sigloss = -bkg_flow.log_prob(dataset)[0].detach().cpu().numpy()
+        sigtr_sigloss = -sig_flow.eval_log_prob(dataset)[0]
+        bkgtr_sigloss = -bkg_flow.eval_log_prob(dataset)[0]
         plt.scatter(bkgtr_sigloss,sigtr_sigloss,s=2,label=sig_labels[i])
     plt.xlim([0,xlim])
     plt.ylim([0,ylim])
@@ -684,34 +448,21 @@ def draw_2d_quak_MultiSigVsBkg(sig_flow,bkg_flow,sig_data,sig_labels,bkg_data,xl
 
     return
 
-def make_summaryPdf(name,sig_flow,bkg_flow,sig_train,bkg_train,sig_test,bkg_test):
+def make_summaryPdf(name,sig_flow,bkg_flow,sig_train,bkg_train,sig_test,bkg_test,varNames):
     from matplotlib.backends.backend_pdf import PdfPages
     with PdfPages('plots/training_plots/'+name+'/summary.pdf') as pdf:
-        plot_density_estimation(sig_flow,sig_train,pdfpage=pdf)
-        plot_density_estimation(bkg_flow,bkg_train,pdfpage=pdf)
+        plot_density_estimation(sig_flow,sig_train,varNames,pdfpage=pdf)
+        plot_density_estimation(bkg_flow,bkg_train,varNames,pdfpage=pdf)
         make_aucs_bkgtr(bkg_flow,sig_test,bkg_test,pdfpage=pdf)
         make_aucs_sigtr(sig_flow,sig_test,bkg_test,pdfpage=pdf)
         draw_2d_quak_space(sig_flow,bkg_flow,bkg_test,"Background Test Data",pdfpage=pdf)
         draw_2d_quak_space(sig_flow,bkg_flow,sig_test,"Signal Test Data",pdfpage=pdf)
         draw_2d_quak_SigVsBkg(sig_flow,bkg_flow,sig_test,bkg_test,pdfpage=pdf)
 
-def clip_tails(data,var='all',bound=10.0):
-    vars = ['mj_1', 't21_1','t32_1', 't43_1', 'ts_1', 'pb_1', 'npf_1',
-            'mj_2', 't21_2','t32_2', 't43_2', 'ts_2', 'pb_2', 'npf_2']
+def clip_tails(data,bound=10.0):
     nev_init = data.shape[0]
-    if var == 'all':
-        good = np.all(data < bound, axis=1)
-        out = data[good]
-    elif type(var) == str:
-        ind = vars.index(var)
-        good = data[:,ind] < bound
-        out = data[good]
-    else:
-        out = data
-        for v in vars:
-            ind = vars.index(var)
-            good = out[:,ind] < bound
-            out = out[good]
+    good = np.all(data < bound, axis=1)
+    out = data[good]
     nev_fin = out.shape[0]
     print("Initial: {0} events \nFinal: {1} events \nRemoved {2:.4f}%".format(nev_init,nev_fin,100*(nev_init-nev_fin)/nev_init))
     return out
@@ -745,8 +496,8 @@ def prepare_stats_data(sig_flow,bkg_flow,sig_test,bkg_test):
     bkg_loss_indices = np.where(test_labels==0)
     sig_loss_indices = np.where(test_labels==1)
 
-    bkgtr_test_losses = -bkg_flow.log_prob(test_data)[0].detach().cpu().numpy()
-    sigtr_test_losses = -sig_flow.log_prob(test_data)[0].detach().cpu().numpy()
+    bkgtr_test_losses = -bkg_flow.eval_log_prob(test_data)[0]
+    sigtr_test_losses = -sig_flow.eval_log_prob(test_data)[0]
 
     return test_masses, sigtr_test_losses, bkgtr_test_losses, test_labels
 
@@ -764,9 +515,17 @@ def normalize_data(data,inp_mean=None,inp_std=None):
             data[:,index] = (data[:,index]-mean)/std
         return data
 
-def load_bkg_batch(sample,batch,Mjj_cut=1200,pt_cut=550,eta_cut=None):
+def load_full(sample,num_batches=1,bkg_mean=None,bkg_std=None,add_mjj=False,add_lsf3=False):
+    data, unnorm_data, masses, varNames = LAPS_train(sample,num_batches=num_batches,add_mjj=add_mjj,add_lsf3=add_lsf3)
+    if bkg_mean is not None and bkg_std is not None:
+        data = normalize_data(data,inp_mean=bkg_mean,inp_std=bkg_std)
+    else:
+        data = normalize_data(data)
+    return data, unnorm_data, masses
+
+def load_bkg_batch(sample,batch,Mjj_cut=1200,pt_cut=550,eta_cut=None,add_mjj=False,add_lsf3=False):
     train_batch = get_batch_file(sample, batch)
-    norm_data, masses = extract_trainVars(train_batch,Mjj_cut=Mjj_cut,pt_cut=pt_cut,eta_cut=eta_cut)
+    norm_data, masses, varNames = extract_trainVars(train_batch,Mjj_cut=Mjj_cut,pt_cut=pt_cut,eta_cut=eta_cut,add_mjj=add_mjj,add_lsf3=add_lsf3)
 
     smooth_jet1_numpfconst = smoothen_integers(norm_data[:,6])
     smooth_jet2_numpfconst = smoothen_integers(norm_data[:,13])
@@ -776,16 +535,10 @@ def load_bkg_batch(sample,batch,Mjj_cut=1200,pt_cut=550,eta_cut=None):
 
     return norm_data, unnorm_data, masses
 
-def load_full(sample,num_batches=1,bkg_mean=None,bkg_std=None):
-    data, unnorm_data, masses = LAPS_train(sample,num_batches=num_batches)
-    if bkg_mean is not None and bkg_std is not None:
-        data = normalize_data(data,inp_mean=bkg_mean,inp_std=bkg_std)
-    return data, unnorm_data, masses
-
-def load_and_split_bkg(sample,num_batches=1):
+def load_and_split_bkg(sample,num_batches=1,add_mjj=False,add_lsf3=False):
     # load data
-    bkg_train, bkg_train_unnorm, bkg_train_masses = LAPS_train(sample_type=sample, num_batches=num_batches)
-    bkg_test, bkg_test_unnorm, bkg_test_masses = LAPS_train(sample_type=sample, num_batches=num_batches, invert=True)
+    bkg_train, bkg_train_unnorm, bkg_train_masses, varNames = LAPS_train(sample_type=sample, num_batches=num_batches, add_mjj=add_mjj, add_lsf3=add_lsf3)
+    bkg_test, bkg_test_unnorm, bkg_test_masses, varNames = LAPS_train(sample_type=sample, num_batches=num_batches, invert=True, add_mjj=add_mjj, add_lsf3=add_lsf3)
     # normalize to mean 0, std 1
     bkg_train = normalize_data(bkg_train)
     bkg_test = normalize_data(bkg_test)
@@ -801,11 +554,12 @@ def load_and_split_bkg(sample,num_batches=1):
 
     return [(bkg_train, bkg_train_unnorm, bkg_train_masses),
             (bkg_test, bkg_test_unnorm, bkg_test_masses),
-            (bkg_mean_train, bkg_std_train), (bkg_mean_test, bkg_std_test)]
+            (bkg_mean_train, bkg_std_train), (bkg_mean_test, bkg_std_test),
+            varNames]
 
-def load_and_split_sig(sample,train_frac,bkg_mean_train,bkg_std_train,bkg_mean_test,bkg_std_test,num_batches=1):
+def load_and_split_sig(sample,train_frac,bkg_mean_train,bkg_std_train,bkg_mean_test,bkg_std_test,num_batches=1,add_mjj=False,add_lsf3=False):
     # load data
-    sig_data, sig_unnorm_data, sig_masses = LAPS_train(sample, num_batches = 1)
+    sig_data, sig_unnorm_data, sig_masses, varNames = LAPS_train(sample, num_batches = 1, add_mjj=add_mjj, add_lsf3=add_lsf3)
     # split manually into train/test
     n_sig = sig_masses.size
     n_sig_train = int(train_frac*n_sig)
@@ -821,11 +575,12 @@ def load_and_split_sig(sample,train_frac,bkg_mean_train,bkg_std_train,bkg_mean_t
     print("{0} {1} testing events".format(n_sig_test,sample))
 
     return [(sig_train, sig_train_unnorm, sig_train_masses),
-            (sig_test, sig_test_unnorm, sig_test_masses)]
+            (sig_test, sig_test_unnorm, sig_test_masses),
+            varNames]
 
-def load_test_sig(sample,train_frac,bkg_mean_test,bkg_std_test,num_batches=1):
+def load_test_sig(sample,train_frac,bkg_mean_test,bkg_std_test,num_batches=1,add_mjj=False,add_lsf3=False):
     # load data
-    sig_data, sig_unnorm_data, sig_masses = LAPS_train(sample, num_batches = 1)
+    sig_data, sig_unnorm_data, sig_masses, varNames = LAPS_train(sample, num_batches = 1, add_mjj=add_mjj, add_lsf3=add_lsf3)
     # split manually into train/test
     n_sig = sig_masses.size
     n_sig_train = int(train_frac*n_sig)
@@ -834,9 +589,9 @@ def load_test_sig(sample,train_frac,bkg_mean_test,bkg_std_test,num_batches=1):
     # normalize signal to bkg mean/std
     sig_test = normalize_data(sig_test,inp_mean=bkg_mean_test,inp_std=bkg_std_test)
 
-    return sig_test, sig_test_unnorm, sig_test_masses
+    return sig_test, sig_test_unnorm, sig_test_masses, varNames
 
-def load_and_split_multiSig(samples,train_frac,bkg_mean_train,bkg_std_train,bkg_mean_test,bkg_std_test,num_batches=1):
+def load_and_split_multiSig(samples,train_frac,bkg_mean_train,bkg_std_train,bkg_mean_test,bkg_std_test,num_batches=1,add_mjj=False,add_lsf3=False):
     train_sets = []
     train_sets_unnorm = []
     train_sets_mass = []
@@ -845,7 +600,7 @@ def load_and_split_multiSig(samples,train_frac,bkg_mean_train,bkg_std_train,bkg_
     test_sets_mass = []
 
     for sample in samples:
-        data, unnorm_data, masses = LAPS_train(sample,num_batches=1)
+        data, unnorm_data, masses, varNames = LAPS_train(sample,num_batches=1,add_mjj=add_mjj, add_lsf3=add_lsf3)
         n_sig = masses.size
         n_train = int(train_frac*n_sig)
         train, train_unnorm, train_masses = data[:n_train], unnorm_data[:n_train], masses[:n_train]
@@ -873,27 +628,32 @@ def load_and_split_multiSig(samples,train_frac,bkg_mean_train,bkg_std_train,bkg_
     n_sig_test = sig_test_masses.size
 
     return [(sig_train, sig_train_unnorm, sig_train_masses),
-            (sig_test, sig_test_unnorm, sig_test_masses)]
+            (sig_test, sig_test_unnorm, sig_test_masses),
+            varNames]
 
 def train_pipeline_bkg(bkg_sample,params_dict):
     # parse model parameters
-    clip = params_dict["clip"]
-    flow_type = params_dict["flow_type"]
-    tail_bound = params_dict["tail_bound"]
-    hidden_features = params_dict["hidden_features"]
-    num_layers = params_dict["num_layers"]
-    num_blocks_per_layer = params_dict["num_blocks_per_layer"]
-    patience = params_dict["patience"]
-    learning_rate = params_dict["learning_rate"]
-    save_model = params_dict["save_model"]
-    bs = params_dict["bs"]
+    clip = params_dict["clip"] if "clip" in params_dict.keys() else None
+    flow_type = params_dict["flow_type"] if "flow_type" in params_dict.keys() else "NSRATQUAD"
+    tail_bound = params_dict["tail_bound"] if "tail_bound" in params_dict.keys() else 10
+    hidden_features = params_dict["hidden_features"] if "hidden_features" in params_dict.keys() else 120
+    num_layers = params_dict["num_layers"] if "num_layers" in params_dict.keys() else 6
+    num_blocks_per_layer = params_dict["num_blocks_per_layer"] if "num_blocks_per_layer" in params_dict.keys() else 4
+    patience = params_dict["patience"] if "patience" in params_dict.keys() else 20
+    learning_rate = params_dict["learning_rate"] if "learning_rate" in params_dict.keys() else 5e-5
+    save_model = params_dict["save_model"] if "save_model" in params_dict.keys() else False
+    bs = params_dict["bs"] if "bs" in params_dict.keys() else 10000
+    add_mjj = params_dict["add_mjj"] if "add_mjj" in params_dict.keys() else False
+    add_lsf3 = params_dict["add_lsf3"] if "add_lsf3" in params_dict.keys() else False
 
     # loading in bkg datasets
-    bkg_info = load_and_split_bkg(bkg_sample)
+    bkg_info = load_and_split_bkg(bkg_sample,add_mjj=add_mjj,add_lsf3=add_lsf3)
     bkg_train, bkg_train_unnorm, bkg_train_masses = bkg_info[0]
     bkg_test, bkg_test_unnorm, bkg_test_masses = bkg_info[1]
     bkg_mean_train, bkg_std_train = bkg_info[2]
     bkg_mean_test, bkg_std_test = bkg_info[3]
+    varNames = bkg_info[4]
+    num_features = bkg_train.shape[1]
 
     # clipping long tails
     if clip is not None:
@@ -901,7 +661,11 @@ def train_pipeline_bkg(bkg_sample,params_dict):
 
     # plotting input variables
     flowName = '{0}_clip{1}_{2}_k{3}_hf{4}_nbpl{5}_tb{6}'.format(bkg_sample, clip, flow_type, num_layers, hidden_features, num_blocks_per_layer, tail_bound)
-    plot_input_variables(bkg_train,flowName)
+    if add_mjj:
+        flowName += "_addMjj"
+    if add_lsf3:
+        flowName += "_addLSF3"
+    plot_input_variables(bkg_train,flowName,varNames)
 
     # creating tensors
     total_bkg = torch.tensor(bkg_train)
@@ -910,7 +674,7 @@ def train_pipeline_bkg(bkg_sample,params_dict):
 
     # train the model
     bkgFlowName = flowName+".pt"
-    bkg_flow, min_loss, bkg_losses = train_NF(bkg_train_iterator,bkgFlowName,flow_type=flow_type,
+    bkg_flow, min_loss, bkg_losses = train_NF(bkg_train_iterator,bkgFlowName,flow_type=flow_type,num_features=num_features,
                                                   tail_bound=tail_bound,hidden_features=hidden_features,num_layers=num_layers,
                                                   num_blocks_per_layer=num_blocks_per_layer,
                                                   learning_rate=learning_rate,patience=patience,
@@ -932,32 +696,43 @@ def train_pipeline_bkg(bkg_sample,params_dict):
 
 def train_pipeline_sig(sig_sample,bkg_sample,params_dict,train_frac=0.9,bkg_model=None):
     # parse model parameters
-    clip = params_dict["clip"]
-    flow_type = params_dict["flow_type"]
-    tail_bound = params_dict["tail_bound"]
-    hidden_features = params_dict["hidden_features"]
-    num_layers = params_dict["num_layers"]
-    num_blocks_per_layer = params_dict["num_blocks_per_layer"]
-    patience = params_dict["patience"]
-    learning_rate = params_dict["learning_rate"]
-    save_model = params_dict["save_model"]
-    bs = params_dict["bs"]
+    clip = params_dict["clip"] if "clip" in params_dict.keys() else None
+    flow_type = params_dict["flow_type"] if "flow_type" in params_dict.keys() else "NSRATQUAD"
+    tail_bound = params_dict["tail_bound"] if "tail_bound" in params_dict.keys() else 10
+    hidden_features = params_dict["hidden_features"] if "hidden_features" in params_dict.keys() else 120
+    num_layers = params_dict["num_layers"] if "num_layers" in params_dict.keys() else 6
+    num_blocks_per_layer = params_dict["num_blocks_per_layer"] if "num_blocks_per_layer" in params_dict.keys() else 4
+    patience = params_dict["patience"] if "patience" in params_dict.keys() else 20
+    learning_rate = params_dict["learning_rate"] if "learning_rate" in params_dict.keys() else 5e-5
+    save_model = params_dict["save_model"] if "save_model" in params_dict.keys() else False
+    bs = params_dict["bs"] if "bs" in params_dict.keys() else 10000
+    add_mjj = params_dict["add_mjj"] if "add_mjj" in params_dict.keys() else False
+    add_lsf3 = params_dict["add_lsf3"] if "add_lsf3" in params_dict.keys() else False
 
     # loading in bkg datasets
-    bkg_info = load_and_split_bkg(bkg_sample)
+    bkg_info = load_and_split_bkg(bkg_sample,add_mjj=add_mjj,add_lsf3=add_lsf3)
     bkg_train, bkg_train_unnorm, bkg_train_masses = bkg_info[0]
     bkg_test, bkg_test_unnorm, bkg_test_masses = bkg_info[1]
     bkg_mean_train, bkg_std_train = bkg_info[2]
     bkg_mean_test, bkg_std_test = bkg_info[3]
+    varNames = bkg_info[4]
     # loading signal datasets
     if type(sig_sample) == list:
-        sig_info = load_and_split_multiSig(sig_sample,train_frac,bkg_mean_train,bkg_std_train,bkg_mean_test,bkg_std_test)
+        sig_info = load_and_split_multiSig(sig_sample,train_frac,
+                                           bkg_mean_train,bkg_std_train,
+                                           bkg_mean_test,bkg_std_test,
+                                           add_mjj=add_mjj,add_lsf3=add_lsf3)
         sigName_format = '-and-'.join(sig_sample)
     else:
-        sig_info = load_and_split_sig(sig_sample,train_frac,bkg_mean_train,bkg_std_train,bkg_mean_test,bkg_std_test)
+        sig_info = load_and_split_sig(sig_sample,train_frac,
+                                      bkg_mean_train,bkg_std_train,
+                                      bkg_mean_test,bkg_std_test,
+                                      add_mjj=add_mjj,add_lsf3=add_lsf3)
         sigName_format = sig_sample
     sig_train_data, sig_train_unnorm_data, sig_train_masses = sig_info[0]
     sig_test_data, sig_test_unnorm_data, sig_test_masses = sig_info[1]
+    varNames = sig_info[2]
+    num_features = sig_train_data.shape[1]
 
     # clipping long tails
     if clip is not None:
@@ -965,7 +740,11 @@ def train_pipeline_sig(sig_sample,bkg_sample,params_dict,train_frac=0.9,bkg_mode
 
     # plotting input data
     flowName = '{0}_clip{1}_{2}_k{3}_hf{4}_nbpl{5}_tb{6}'.format(sigName_format, clip, flow_type, num_layers, hidden_features, num_blocks_per_layer, tail_bound)
-    plot_input_variables(sig_train_data,flowName)
+    if add_mjj:
+        flowName += "_addMjj"
+    if add_lsf3:
+        flowName += "_addLSF3"
+    plot_input_variables(sig_train_data,flowName,varNames)
 
     # creating tensors
     total_sig = torch.tensor(sig_train_data)
@@ -973,8 +752,8 @@ def train_pipeline_sig(sig_sample,bkg_sample,params_dict,train_frac=0.9,bkg_mode
     sig_train_iterator = utils.DataLoader(total_sig,batch_size=bs,shuffle=True,generator=torch.Generator(device='cuda'))
 
     # train the model
-    sigFlowName = '{0}_clip{1}_{2}_k{3}_hf{4}_nbpl{5}_tb{6}.pt'.format(sigName_format, clip, flow_type, num_layers, hidden_features, num_blocks_per_layer, tail_bound)
-    sig_flow, min_loss, sig_losses = train_NF(sig_train_iterator,sigFlowName,flow_type=flow_type,
+    sigFlowName = flowName+".pt"
+    sig_flow, min_loss, sig_losses = train_NF(sig_train_iterator,sigFlowName,flow_type=flow_type,num_features=num_features,
                                                   tail_bound=tail_bound,hidden_features=hidden_features,num_layers=num_layers,
                                                   num_blocks_per_layer=num_blocks_per_layer,
                                                   learning_rate=learning_rate,patience=patience,
@@ -995,7 +774,7 @@ def train_pipeline_sig(sig_sample,bkg_sample,params_dict,train_frac=0.9,bkg_mode
     # make pdf summary with background comoparisons
     bkg_flow = load_model(bkg_sample,params=params_dict,name=bkg_model)
     if bkg_flow is not None:
-        make_summaryPdf(flowName,sig_flow,bkg_flow,sig_train_data,bkg_train,sig_test_data,bkg_test)
+        make_summaryPdf(flowName,sig_flow,bkg_flow,sig_train_data,bkg_train,sig_test_data,bkg_test,varNames)
 
     sig_train_suite = (sig_train_data, sig_train_unnorm_data, sig_train_masses)
     sig_test_suite = (sig_test_data, sig_test_unnorm_data, sig_test_masses)
@@ -1013,18 +792,27 @@ def load_model(sample="",params={},name=None,device=torch.device("cuda:0")):
             return flow
     else:
         # parse model parameters
-        clip = params_dict["clip"]
-        flow_type = params_dict["flow_type"]
-        tail_bound = params_dict["tail_bound"]
-        hidden_features = params_dict["hidden_features"]
-        num_layers = params_dict["num_layers"]
-        patience = params_dict["patience"]
-        learning_rate = params_dict["learning_rate"]
-        save_model = params_dict["save_model"]
-        bs = params_dict["bs"]
+        clip = params_dict["clip"] if "clip" in params_dict.keys() else None
+        flow_type = params_dict["flow_type"] if "flow_type" in params_dict.keys() else "NSRATQUAD"
+        tail_bound = params_dict["tail_bound"] if "tail_bound" in params_dict.keys() else 10
+        hidden_features = params_dict["hidden_features"] if "hidden_features" in params_dict.keys() else 120
+        num_layers = params_dict["num_layers"] if "num_layers" in params_dict.keys() else 6
+        num_blocks_per_layer = params_dict["num_blocks_per_layer"] if "num_blocks_per_layer" in params_dict.keys() else 4
+        patience = params_dict["patience"] if "patience" in params_dict.keys() else 20
+        learning_rate = params_dict["learning_rate"] if "learning_rate" in params_dict.keys() else 5e-5
+        save_model = params_dict["save_model"] if "save_model" in params_dict.keys() else False
+        bs = params_dict["bs"] if "bs" in params_dict.keys() else 10000
+        add_mjj = params_dict["add_mjj"] if "add_mjj" in params_dict.keys() else False
+        add_lsf3 = params_dict["add_lsf3"] if "add_lsf3" in params_dict.keys() else False
 
         # looking for pre-trained model
-        flowName = '{0}_clip{1}_{2}_k{3}_hf{4}_nbpl{5}_tb{6}.pt'.format(sample, clip, flow_type, num_layers, hidden_features, num_blocks_per_layer, tail_bound)
+        flowName = '{0}_clip{1}_{2}_k{3}_hf{4}_nbpl{5}_tb{6}'.format(sample, clip, flow_type, num_layers, hidden_features, num_blocks_per_layer, tail_bound)
+        if add_mjj:
+            flowName += "_addMjj"
+        if add_lsf3:
+            flowName += "_addLSF3"
+        flowName += ".pt"
+
         if not os.path.exists("saved_flows/"+flowName):
             print("ERROR: no trained model exists!")
             return None
@@ -1032,71 +820,51 @@ def load_model(sample="",params={},name=None,device=torch.device("cuda:0")):
             flow = torch.load("saved_flows/"+flowName,map_location=device)
             return flow
 
-def eval_model(sig_samples,sig_model,sig_flow,bkg_model,bkg_flow,bkg_test,bkg_test_unnorm,bkg_test_masses,train_frac=0.9):
-    bkg_mean_test = np.mean(bkg_test_unnorm,axis=0)
-    bkg_std_test = np.std(bkg_test_unnorm,axis=0)
-    for samp in sig_samples:
-        sig, sig_unnorm, sig_mass = load_test_sig(samp,train_frac,bkg_mean_test,bkg_std_test)
-        sig_vals = (sig,sig_unnorm,sig_mass)
-        bkg_vals = (bkg,bkg_unnorm,bkg_mass)
-        test_masses, sigtr_test_losses, bkgtr_test_losses, test_labels = prepare_stats_data(sig_flow,bkg_flow,sig_vals,bkg_vals)
-        output = np.array([test_masses,sigtr_test_losses,bkgtr_test_losses,test_labels])
-
-        if not os.path.isdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_model,bkg_model)):
-            os.mkdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_model,bkg_model))
-        outFile = "sigTrain{0}_bkgTrain{1}/test_{2}.npy".format(sig_model,bkg_model,samp)
-        np.save("test_data_forStats/"+outFile,output)
-
-        plt.figure(figsize = (10,10))
-        sig_bkgtr_test_losses = bkgtr_test_losses[test_labels==1]
-        sig_sigtr_test_losses = sigtr_test_losses[test_labels==1]
-        bkg_bkgtr_test_losses = bkgtr_test_losses[test_labels==0]
-        bkg_sigtr_test_losses = sigtr_test_losses[test_labels==0]
-        plt.scatter(bkg_bkgtr_test_losses,bkg_sigtr_test_losses,s=2,label="{0} Test Data".format(bkg_model))
-        plt.scatter(sig_bkgtr_test_losses,sig_sigtr_test_losses,s=2,label="{0} Test Data".format(samp))
-        plt.legend(loc='upper right',fontsize=14)
-        plt.xlim([0,50])
-        plt.ylim([0,50])
-        plt.xticks(np.arange(0,55,step=5))
-        plt.yticks(np.arange(0,55,step=5))
-        plt.title("Signal Trained on {0}".format(sig_model))
-        saveLoc = "plots/QUAK_spaces/sigTrain{0}_bkgTrain{1}/".format(sig_model,bkg_model)
-        if not os.path.isdir(saveLoc):
-            os.mkdir(saveLoc)
-        saveFile = saveLoc+"eval_{0}.png".format(samp)
-        plt.savefig(saveFile)
-        plt.close()
-
-        del test_masses, sigtr_test_losses, bkgtr_test_losses, test_labels
-        del output
-
-def evalAndSave(sig_flow,sig_flow_name,bkg_flow,bkg_flow_name,test_data,test_masses,test_name,label):
+def evalAndSave(sig_flow,sig_flow_name,bkg_flow,bkg_flow_name,test_data,test_masses,test_name,label,transform=None,outdir="test_data_forStats"):
     nev = test_data.shape[0]
     labels = label*np.ones(nev,dtype='float32')
-    bkgtr_test_losses = -bkg_flow.log_prob(test_data)[0].detach().cpu().numpy()
-    sigtr_test_losses = -sig_flow.log_prob(test_data)[0].detach().cpu().numpy()
+    bkgtr_test_losses = -bkg_flow.eval_log_prob(test_data)[0]
+    sigtr_test_losses = -sig_flow.eval_log_prob(test_data)[0]
+    
+    if transform is not None:
+        combined_data = np.concatenate((test_masses[:,np.newaxis],sigtr_test_losses[:,np.newaxis],bkgtr_test_losses[:,np.newaxis]),axis=1)
+        transformed = transform.transform(combined_data)
+        sigtr_test_losses = transformed[:,1]
+        bkgtr_test_losses = transformed[:,2]
+    
     output = np.array([test_masses,sigtr_test_losses,bkgtr_test_losses,labels])
 
-    if not os.path.isdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_flow_name,bkg_flow_name)):
-        os.mkdir("test_data_forStats/sigTrain{0}_bkgTrain{1}".format(sig_flow_name,bkg_flow_name))
+    if not os.path.isdir(outdir+"/sigTrain{0}_bkgTrain{1}".format(sig_flow_name,bkg_flow_name)):
+        os.mkdir(outdir+"/sigTrain{0}_bkgTrain{1}".format(sig_flow_name,bkg_flow_name))
     outFile = "sigTrain{0}_bkgTrain{1}/eval_{2}.npy".format(sig_flow_name,bkg_flow_name,test_name)
-    np.save("test_data_forStats/"+outFile,output)
+    np.save(outdir+"/"+outFile,output)
 
     del bkgtr_test_losses, sigtr_test_losses
     del output
     torch.cuda.empty_cache()
 
-def sig_vs_bkg_2DQuakSpace(sig_train_name,bkg_train_name,sig_bkgtr_test_losses,sig_sigtr_test_losses,bkg_bkgtr_test_losses,bkg_sigtr_test_losses,sig_name):
+def sig_vs_bkg_2DQuakSpace(sig_train_name,bkg_train_name,sig_bkgtr_test_losses,sig_sigtr_test_losses,bkg_bkgtr_test_losses,bkg_sigtr_test_losses,sig_name,mjjDecorr=False,add_lsf3=False):
     plt.figure(figsize = (10,10))
     plt.scatter(bkg_bkgtr_test_losses,bkg_sigtr_test_losses,s=2,label="{0}".format(bkg_train_name))
     plt.scatter(sig_bkgtr_test_losses,sig_sigtr_test_losses,s=2,label="{0}".format(sig_name))
     plt.legend(loc='upper right',fontsize=14)
-    plt.xlim([0,50])
-    plt.ylim([0,50])
-    plt.xticks(np.arange(0,55,step=5))
-    plt.yticks(np.arange(0,55,step=5))
+    if mjjDecorr:
+        plt.xlim([-20,20])
+        plt.ylim([-20,20])
+        plt.xticks(np.arange(-20,25,step=5))
+        plt.yticks(np.arange(-20,25,step=5))
+    else:
+        plt.xlim([0,50])
+        plt.ylim([0,50])
+        plt.xticks(np.arange(0,55,step=5))
+        plt.yticks(np.arange(0,55,step=5))
     plt.title("Signal Trained on {0}".format(sig_train_name))
-    saveLoc = "plots/QUAK_spaces/sigTrain{0}_bkgTrain{1}/".format(sig_train_name,bkg_train_name)
+    saveLoc = "plots/QUAK_spaces/sigTrain{0}_bkgTrain{1}".format(sig_train_name,bkg_train_name)
+    if mjjDecorr:
+        saveLoc +="_mjjDecorr"
+    if add_lsf3:
+        saveLoc += "_addLSF3"
+    saveLoc += "/"
     if not os.path.isdir(saveLoc):
         os.mkdir(saveLoc)
     saveFile = saveLoc+"eval_{0}.png".format(sig_name)
@@ -1104,3 +872,150 @@ def sig_vs_bkg_2DQuakSpace(sig_train_name,bkg_train_name,sig_bkgtr_test_losses,s
     plt.close()
 
     del sig_bkgtr_test_losses, sig_sigtr_test_losses, bkg_bkgtr_test_losses, bkg_sigtr_test_losses
+
+def marginal_log_prob(flow,inputs,axes,bounds=[-10,10],step=0.1):
+    locs = np.arange(bounds[0],bounds[1],step=step) + step/2 # midpoints
+    n_ax = len(axes)
+
+    int_points = []
+    def make_integral_points(locs,loop_depth,point):
+        if loop_depth >= 1:
+            for pt in locs:
+                make_integral_points(locs,loop_depth-1,point+[pt])
+        else:
+            int_points.append(point)
+    make_integral_points(locs,n_ax,[])
+
+    total_prob = 0
+    int_vol = step**n_ax
+    for pt in int_points:
+        int_inputs = np.copy(inputs)
+        for i,ax in enumerate(axes):
+            int_inputs[:,ax] = pt[i]
+        tens_inputs = torch.as_tensor(int_inputs)
+        total_prob += np.exp(flow.eval_log_prob(tens_inputs)[0])*int_vol
+        del int_inputs, tens_inputs
+
+    return np.log(total_prob)
+
+def integrated_likelihood(flow,data,axis,bounds=[-10,10],step=0.1):
+    grid = np.arange(bounds[0],bounds[1],step=step) + step/2
+    num_pts = data.shape[0]
+    data_grid = np.tile(data,[len(grid),1])
+    data_grid[:,axis] = np.repeat(grid,num_pts)
+    num_splits = data_grid.shape[0] // 100000 if data_grid.shape[0] > 100000 else 1
+    losses = []
+    t1 = time.time()
+    for subarr in np.array_split(data_grid,num_splits):
+        loss = flow.eval_log_prob(subarr)[0]
+        losses.append(loss)
+    t2 = time.time()
+    print("took {0:.4f} secs to process {1} events".format(t2-t1,data_grid.shape[0]))
+    losses = np.concatenate(losses)
+    losses_by_pt = []
+    for i in range(num_pts):
+        losses_by_pt.append(step*np.sum(np.exp(losses[i::num_pts])))
+    return np.array(losses_by_pt)
+
+# Neural network to evaluate models
+class simpleNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.transform = nn.Sequential(
+            nn.Linear(2,128),
+            nn.Sigmoid(),
+            nn.Linear(128,1),
+            nn.Sigmoid()
+        )
+    
+    def forward(self,x):
+        return self.transform(x)
+    
+def NNmodelPerformance(sig_trainName,sig_testName,bkg_name="QCDBKG",base_dir="data_forStats_mjjDecorrelate/",
+                       n_train=10000,n_epoch=1000):
+    device = device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    data_dir = base_dir+"sigTrain{0}_bkgTrain{1}/".format(sig_trainName,bkg_name)
+    
+    # loading bkg data
+    bkg_samples = [f for f in os.listdir(data_dir) if bkg_name in f]
+    bkg_sigtr_losses = []
+    bkg_bkgtr_losses = []
+    for samp in bkg_samples:
+        arr = np.load(data_dir+samp)
+        bkg_sigtr_losses.append(arr[1])
+        bkg_bkgtr_losses.append(arr[2])
+        del arr
+    bkg_sigtr_losses = np.concatenate(bkg_sigtr_losses)
+    bkg_bkgtr_losses = np.concatenate(bkg_bkgtr_losses)
+    bkg_data = np.column_stack((bkg_bkgtr_losses,bkg_sigtr_losses))
+    del bkg_sigtr_losses, bkg_bkgtr_losses
+    
+    # signal data
+    arr = np.load(data_dir+"eval_{0}.npy".format(sig_testName))
+    sig_sigtr_losses = arr[1]
+    sig_bkgtr_losses = arr[2]
+    sig_data = np.column_stack((sig_bkgtr_losses,sig_sigtr_losses))
+    del arr, sig_sigtr_losses, sig_bkgtr_losses
+    
+    # train/test split
+    sig_train = sig_data[:n_train]
+    sig_test = sig_data[n_train:]
+    bkg_train = bkg_data[:n_train]
+    bkg_test = bkg_data[n_train:]
+    
+    train_losses = np.concatenate((sig_train,bkg_train),axis=0)
+    train_labels = np.concatenate((np.ones(sig_train.shape[0]),np.zeros(bkg_train.shape[0])))
+    train = np.concatenate((train_losses,train_labels[:,np.newaxis]),axis=1)
+    np.random.shuffle(train)
+    train = torch.tensor(train).to(device)
+
+    test_losses = np.concatenate((sig_test,bkg_test),axis=0)
+    test_labels = np.concatenate((np.ones(sig_test.shape[0]),np.zeros(bkg_test.shape[0])))
+    test = np.concatenate((train_losses,train_labels[:,np.newaxis]),axis=1)
+    np.random.shuffle(test)
+
+    test = torch.tensor(test).to(device)
+    
+    # Build & train model
+    model = simpleNN()
+    model = model.double()
+    model = model.cuda()
+    
+    optimizer = optim.Adam(model.parameters())
+    f_loss = nn.MSELoss()
+
+    n_epoch = 1000
+    losses = []
+    for i in range(n_epoch):
+        x, y = train[:,:2], train[:,2:]
+        output = model(x)
+        loss = f_loss(output,y)
+        losses.append(loss.detach().cpu().numpy())
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        #print("Epoch {}, Loss: {}".format(i,loss))
+        
+    plt.figure(figsize=(8,6))
+    plt.plot(np.arange(n_epoch),losses)
+    plt.title("Sig train {}, bkg train {}, tested on {}".format(sig_trainName,bkg_name,sig_testName))
+    plt.savefig(data_dir+"NN_loss_eval{}.pdf".format(sig_testName))
+    plt.close()
+    
+    y_pred = model(test[:,:2]).detach().cpu().numpy().flatten()
+    y_true = test[:,2:].cpu().numpy().flatten()
+    
+    from sklearn.metrics import roc_curve, auc, roc_auc_score
+    fpr,tpr,thresholds = roc_curve(y_true,y_pred)
+    auc = roc_auc_score(y_true,y_pred)
+    plt.figure(figsize=(8,8))
+    plt.plot(fpr,tpr)
+    plt.title("Sig train {}, bkg train {}, tested on {}".format(sig_trainName,bkg_name,sig_testName))
+    plt.text(0.6,0.1,"AUC = {:.4f}".format(auc),fontsize=14)
+    plt.savefig(data_dir+"NN_roc_eval{}.pdf".format(sig_testName))
+    plt.close()
+
+    del train, test, model
+    
+    return auc
+    
