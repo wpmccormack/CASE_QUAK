@@ -10,7 +10,7 @@ do
     for f in "${fi[@]}"
     do
 	#if [ $val -eq 2 ]
-	if [[ ${f} == *"_10000_sigL_0_"* ]]
+	if [[ ${f} == *"_10000_sigL_-10000_"* ]]
         then
 	    python dijetfit.py -i ${f}.h5 -M ${m} --sig_shape ./SIGTEMPLATEDIR/graviton_interpolation_M${m}.0.root --dcb-model -t ${f} -p plots_M${m}_${f} -t ${f} -c True
 	else
