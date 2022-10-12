@@ -4,7 +4,7 @@ import shutil
 
 def fitting_options():
     parser = optparse.OptionParser()
-    parser.add_option("-l", "--sampleLoc", dest="sampleLoc", default="/uscms/home/sbrightt/nobackup/CASE/analysisOutput/data_forStats_mjjDecorrelate/", help="sample file location, default is /uscms/home/sbrightt/nobackup/CASE/analysisOutput/data_forStats_mjjDecorrelate/")
+    parser.add_option("-l", "--sampleLoc", dest="sampleLoc", default="/uscms/home/sbrightt/nobackup/CASE/analysisOutput/data_forStats_mjjFlatBkg_mjj800_ptCut300_mjjDecorrelate/", help="sample file location, default is /uscms/home/sbrightt/nobackup/CASE/analysisOutput/data_forStats_mjjFlatBkg_mjj800_ptCut300_mjjDecorrelate/")
     parser.add_option("-t", "--sigTrain", dest="sigTrain", default="DUMMYDIR", help="signal was trained on? Example: sigTrainXYY_X3000_Y80_UL17_bkgTrainQCDBKG")
     parser.add_option("-i", "--sigInject", dest="sigInject", default="DUMMYDIR", help="signal you want to inject? Example: eval_XYY_X3000_Y80_UL17")
     parser.add_option("-x", "--crossSection", dest="crossSection", type=int, default=-1, help="how much signal do you want to inject in fb?")

@@ -551,27 +551,37 @@ if __name__ == "__main__":#blackbox2-CutFromMap.root
 
     df = r.RDataFrame("output", "./"+inputFileName)
     dfSIG = r.RDataFrame("output", "./signalQUAKSpace.root")
-    TotalNumSIG = dfSIG.Count().GetValue()
+    TotalNumSIG = dfSIG.Filter("label==1").Count().GetValue()
     for b1 in range(numBins):
         for b2 in range(numBins):
             print("loss2>%s && loss2<%s && loss1>%s && loss1<%s" % (str(bkgThreshold[b1]), str(bkgThreshold[b1+1]), str(sigThresholds[b1][b2]), str(sigThresholds[b1][b2+1])))
             df_tmp = df.Filter("loss2>%s && loss2<%s && loss1>%s && loss1<%s" % (str(bkgThreshold[b1]), str(bkgThreshold[b1+1]), str(sigThresholds[b1][b2]), str(sigThresholds[b1][b2+1])))
-            dfSIG_tmp = dfSIG.Filter("loss2>%s && loss2<%s && loss1>%s && loss1<%s" % (str(bkgThreshold[b1]), str(bkgThreshold[b1+1]), str(sigThresholds[b1][b2]), str(sigThresholds[b1][b2+1])))
+            dfSIG_tmp = dfSIG.Filter("loss2>%s && loss2<%s && loss1>%s && loss1<%s && label==1" % (str(bkgThreshold[b1]), str(bkgThreshold[b1+1]), str(sigThresholds[b1][b2]), str(sigThresholds[b1][b2+1])))
             fracSig = float(dfSIG_tmp.Count().GetValue())/float(TotalNumSIG)
             print(fracSig)
             npy = df_tmp.AsNumpy(columns=["mass"])
+            losses1 = df_tmp.AsNumpy(columns=["loss1"])
+            losses2 = df_tmp.AsNumpy(columns=["loss2"])
             print(npy)
             print(len(npy['mass']))
+            print('avg loss2:')
+            avgloss2 = np.sum(losses2['loss2'])/len(losses2['loss2'])
+            print(avgloss2)
+            print('avg loss1:')
+            avgloss1 = np.sum(losses1['loss1'])/len(losses1['loss1'])
+            print(avgloss1)
             hf = h5py.File("bkgL_%s_%s_sigL_%s_%s" % (str(int(10*bkgThreshold[b1])), str(int(10*bkgThreshold[b1+1])), str(int(10*sigThresholds[b1][b2])), str(int(10*sigThresholds[b1][b2+1]))) + ".h5", 'w')
             hf.create_dataset('mjj', data=np.asarray(npy['mass']))
             hf.create_dataset('fracSig', data=np.asarray([fracSig]))
             hf.create_dataset('numEv', data=np.asarray([len(npy['mass'])]))
+            hf.create_dataset('avgSigLoss', data=np.asarray(avgloss1))
+            hf.create_dataset('avgBkgLoss', data=np.asarray(avgloss2))
             hf.close()
 
 
 
     print("Creating combine command ..")
-    dc_file = open("combineCommandFLOAT.sh","w")
+    dc_file = open("combineCommandFLOAT_CORNER.sh","w")
     dc_file.write("combineCards.py ")
     for i0 in range(numBins):
         if(corner and i0 < numBins-2):
@@ -582,8 +592,22 @@ if __name__ == "__main__":#blackbox2-CutFromMap.root
             title = "bkgL_%s_%s_sigL_%s_%s" % (str(int(10*bkgThreshold[i0])), str(int(10*bkgThreshold[i0+1])), str(int(10*sigThresholds[i0][i1])), str(int(10*sigThresholds[i0][i1+1])))
             dc_file.write("bin_"+title+"=datacard_JJ_"+title+"_FLOAT.txt ")
 
-    dc_file.write("> fullCardFLOAT.txt\n")
+    dc_file.write("> fullCardFLOAT_CORNER.txt\n")
     dc_file.close()
+
+
+    print("Creating combine command ..")
+    dc_file = open("combineCommandFLOAT_ALLBINS.sh","w")
+    dc_file.write("combineCards.py ")
+    for i0 in range(numBins):
+        for i1 in range(numBins):
+            title = "bkgL_%s_%s_sigL_%s_%s" % (str(int(10*bkgThreshold[i0])), str(int(10*bkgThreshold[i0+1])), str(int(10*sigThresholds[i0][i1])), str(int(10*sigThresholds[i0][i1+1])))
+            dc_file.write("bin_"+title+"=datacard_JJ_"+title+"_FLOAT.txt ")
+
+    dc_file.write("> fullCardFLOAT_ALLBINS.txt\n")
+    dc_file.close()
+
+
 
     print("Creating combine command ..")
     dc_file = open("combineCommand.sh","w")
