@@ -45,11 +45,14 @@ Here, you need to be in the combine+python2+old ROOT environment
 The fitting is mostly controlled by QUAK_Space_SignalTester.py, which is in CASEUtils/fitting/.  An example of how I run this code in condor is in CASEUtils/fitting/runCASE_example.sh, but please don't run this script directly.  I don't think you have permission to overwrite some of the stuff in my eos space, but still, best not to risk it.  The main thing to look at is the bash for loop:
 
 for m in {1800..2700..100}
+
 do
-    python QUAK_Space_SignalTester.py -d ./h5s_mjjFlat_35BkgFiles_newSigFracs/\${1} --masspoint \${m} -t \${2} -l \$((\${m}-\$((800+25*(\${m}-2200)/100)))) -u \$((\${m}+\$((800+25*(\${m}-2200)/100))))
+
+    python QUAK\_Space\_SignalTester.py -d ./h5s\_mjjFlat\_35BkgFiles\_newSigFracs/\\${1} --masspoint \\${m} -t \\${2} -l \\$((\\${m}-\\$((800+25*(\\${m}-2200)/100)))) -u \\$((\\${m}+\\$((800+25*(\\${m}-2200)/100))))
+
 done
 
-Quick note: the \${1} argument here is a directory name that contains H5 files.  E.g. sigTrainQstar2000\_W400\_UL17-and-Wp3000\_B400\_UL17-and-XYY\_X3000\_Y80\_UL17\_bkgTrainQCDBKG\_mjjFlat\_mjj800\_ptCut300\_INJECT\_XYY\_X3000\_Y80\_UL17\_XS\_1fb\_35BkgFiles\_10percConsidered\_9Bins.  The \${2} argument is a directory that contains signal template files.  E.g. sigTemplateMakerWithInterpolation\_XToYYprimeTo4Q\_MY80\_MYprime170
+Quick note: the \\${1} argument here is a directory name that contains H5 files.  E.g. sigTrainQstar2000\_W400\_UL17-and-Wp3000\_B400\_UL17-and-XYY\_X3000\_Y80\_UL17\_bkgTrainQCDBKG\_mjjFlat\_mjj800\_ptCut300\_INJECT\_XYY\_X3000\_Y80\_UL17\_XS\_1fb\_35BkgFiles\_10percConsidered\_9Bins.  The \\${2} argument is a directory that contains signal template files.  E.g. sigTemplateMakerWithInterpolation\_XToYYprimeTo4Q\_MY80\_MYprime170
 
  - The -d flag here is the directory with the H5 files.  You can see my tarball /store/user/wmccorma/CASE\_H5Files\_mjjFlat\_35BkgFiles\_9Bins\_newSigFracs\_Oct06.tgz to see exactly how that's configured.  I created it using the code from Step 1 above.
  - The --masspoint flag is the mass hypothesis for the signal
