@@ -21,7 +21,7 @@ So the setup that I have can be found here: /uscms_data/d1/wmccorma/CASE_ALL/.  
 
 If you choose to sourse an up-to-date CMSSW release, like CMSSW_12_4_0_pre2, then you might end up with a directory like /uscms_data/d1/wmccorma/CASE_ALL/CMSSW_12_4_0_pre2/src/.  Within this directory, you can clone https://github.com/wpmccormack/CASE_QUAK.  The important directory for our purposes is "h5Dir"
 
-I personally set up combine with the instructions here: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version.  Then within /uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/ I cloned my fork of the main CASE fitting software: https://github.com/wpmccormack/CASEUtils/tree/master.  You'll need to switch to the QUAK_branch branch.  The fitting code is in the "fitting" directory.
+I personally set up combine with the instructions here: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/#cc7-release-cmssw_10_2_x-recommended-version.  Then within /uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/ I cloned my fork of the main CASE fitting software: https://github.com/wpmccormack/CASEUtils/tree/master.  You'll need to switch to the QUAK_branch_pullInMain_v2 branch (there is a slightly older QUAK_branch branch, that doesn't have some code updates from Oz pulled in; sometimes the performance in the older branch looks a tiny bit better).  The fitting code is in the "fitting" directory.
 
 
 ## 1st step: H5 File Making
