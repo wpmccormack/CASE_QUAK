@@ -46,26 +46,26 @@ The fitting is mostly controlled by QUAK_Space_SignalTester.py, which is in CASE
 
 for m in {1800..2700..100}
 do
-    python QUAK_Space_SignalTester.py -d ./h5s_mjjFlat_35BkgFiles_newSigFracs/${1} --masspoint ${m} -t ${2} -l $((${m}-$((800+25*(${m}-2200)/100)))) -u $((${m}+$((800+25*(${m}-2200)/100))))
+    python QUAK_Space_SignalTester.py -d ./h5s_mjjFlat_35BkgFiles_newSigFracs/\${1} --masspoint \${m} -t \${2} -l \$((\${m}-\$((800+25*(\${m}-2200)/100)))) -u \$((\${m}+\$((800+25*(\${m}-2200)/100))))
 done
 
-Quick note: the ${1} argument here is a directory name that contains H5 files.  E.g. sigTrainQstar2000_W400_UL17-and-Wp3000_B400_UL17-and-XYY_X3000_Y80_UL17_bkgTrainQCDBKG_mjjFlat_mjj800_ptCut300_INJECT_XYY_X3000_Y80_UL17_XS_1fb_35BkgFiles_10percConsidered_9Bins.  The ${2} argument is a directory that contains signal template files.  E.g. sigTemplateMakerWithInterpolation_XToYYprimeTo4Q_MY80_MYprime170
+Quick note: the \${1} argument here is a directory name that contains H5 files.  E.g. sigTrainQstar2000\_W400\_UL17-and-Wp3000\_B400\_UL17-and-XYY\_X3000\_Y80\_UL17\_bkgTrainQCDBKG\_mjjFlat\_mjj800\_ptCut300\_INJECT\_XYY\_X3000\_Y80\_UL17\_XS\_1fb\_35BkgFiles\_10percConsidered\_9Bins.  The \${2} argument is a directory that contains signal template files.  E.g. sigTemplateMakerWithInterpolation\_XToYYprimeTo4Q\_MY80\_MYprime170
 
- - The -d flag here is the directory with the H5 files.  You can see my tarball /store/user/wmccorma/CASE_H5Files_mjjFlat_35BkgFiles_9Bins_newSigFracs_Oct06.tgz to see exactly how that's configured.  I created it using the code from Step 1 above.
+ - The -d flag here is the directory with the H5 files.  You can see my tarball /store/user/wmccorma/CASE\_H5Files\_mjjFlat\_35BkgFiles\_9Bins\_newSigFracs\_Oct06.tgz to see exactly how that's configured.  I created it using the code from Step 1 above.
  - The --masspoint flag is the mass hypothesis for the signal
  - The -t flag is a directory that contains signal templates
  - the -l argument is the minimum of the range for the mjj fit (l stands for lower, here)
  - the -u flag is the maximum of the range for the mjj fit (u stands for upper here)
 
-Another very important thing to note is that the main fitting code relies on *signal templates*.  To derive the signal templates, you need to follow the instrucitons like: https://github.com/case-team/CASEUtils/blob/master/fitting/fit_signalshape_template.sh.  I have templates which you can use at
+Another very important thing to note is that the main fitting code relies on *signal templates*.  To derive the signal templates, you need to follow the instrucitons like: https://github.com/case-team/CASEUtils/blob/master/fitting/fit\_signalshape\_template.sh.  I have templates which you can use at
 
-/uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation (this is graviton signal)
+/uscms\_data/d1/wmccorma/CASE\_ALL/CMSSW\_10\_2\_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation (this is graviton signal)
 
-/uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation_QstarToQW_mW_400
+/uscms\_data/d1/wmccorma/CASE\_ALL/CMSSW\_10\_2\_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation\_QstarToQW\_mW\_400
 
-/uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation_WpToBpT_Bp400_Top170
+/uscms\_data/d1/wmccorma/CASE\_ALL/CMSSW\_10\_2\_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation\_WpToBpT\_Bp400\_Top170
 
-/uscms_data/d1/wmccorma/CASE_ALL/CMSSW_10_2_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation_XToYYprimeTo4Q_MY80_MYprime170
+/uscms\_data/d1/wmccorma/CASE\_ALL/CMSSW\_10\_2\_13/src/CASEUtils/fitting/sigTemplateMakerWithInterpolation\_XToYYprimeTo4Q\_MY80\_MYprime170
 
 You can just copy those directories to whereever you want to use them.  Right now, it is hard-coded that these directories will be within your "fitting" directory.
 
@@ -76,10 +76,10 @@ This will run the full f-test fit for each QUAK bin, generate combine cards, and
 
 The fitting is controlled by combineScan.py.  An example command is:
 
-python combineScan.py -d sigTrainXYY_X3000_Y80_UL17_bkgTrainQCDBKG_INJECT_XYY_X3000_Y80_UL17_XS_100fb_15BkgFiles_30percConsidered_3Bins -t sigTemplateMakerWithInterpolation_WpToBpT_Bp400_Top170 --minMscan 3000 --maxMscan 3000 --massgaps 100
+python combineScan.py -d sigTrainXYY\_X3000\_Y80\_UL17\_bkgTrainQCDBKG\_INJECT\_XYY\_X3000\_Y80\_UL17\_XS\_100fb\_15BkgFiles\_30percConsidered\_3Bins -t sigTemplateMakerWithInterpolation\_WpToBpT\_Bp400\_Top170 --minMscan 3000 --maxMscan 3000 --massgaps 100
 
-A very important thing to note first here, is that a default h5 directory is taken to be: /uscms_data/d1/wmccorma/CASE_ALL/CMSSW_12_4_0_pre2/src/h5Dir.  You'll probably want to change that within the code to whereever your files are.  It can be changed with an argument, but it'd be a pain to have to specify it every time.
+A very important thing to note first here, is that a default h5 directory is taken to be: /uscms\_data/d1/wmccorma/CASE\_ALL/CMSSW\_12\_4\_0\_pre2/src/h5Dir.  You'll probably want to change that within the code to whereever your files are.  It can be changed with an argument, but it'd be a pain to have to specify it every time.
 
-Of course, you can see what the various arguments are by looking in combineScan.py.  The -d argument specifies the name of the directory where your h5 files are, which is sigTrainXYY_X3000_Y80_UL17_bkgTrainQCDBKG_INJECT_XYY_X3000_Y80_UL17_XS_100fb_15BkgFiles_30percConsidered_3Bins (continuing the example from the above h5 file making block).  You can adjust the mass ranges considered in a signficance scan.
+Of course, you can see what the various arguments are by looking in combineScan.py.  The -d argument specifies the name of the directory where your h5 files are, which is sigTrainXYY\_X3000\_Y80\_UL17\_bkgTrainQCDBKG\_INJECT\_XYY\_X3000\_Y80\_UL17\_XS\_100fb\_15BkgFiles\_30percConsidered\_3Bins (continuing the example from the above h5 file making block).  You can adjust the mass ranges considered in a signficance scan.
 
  
