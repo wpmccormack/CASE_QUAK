@@ -74,6 +74,7 @@ You can just copy those directories to whereever you want to use them.  Right no
 
 This will run the full f-test fit for each QUAK bin, generate combine cards, and then run a combined significance and p-val fits, and run Asymptotic Limits.  Root files with the significance (or p-value) are generated, as are a bunch of plots.  Everything will be put in the H5 directory that you specify with the -d flag
 
+There is also pValueScanBig_plusPLC_WITHLIMITS_autoWindow.py, which is some python code to make plots from combine root files that are in eos.  This is mostly just a reference.
 
 ### Older instructions.  Do not use unless you know what you're doing
 
